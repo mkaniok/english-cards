@@ -11,20 +11,28 @@
     <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#1e1b4b" flood-opacity=".35"/>
     </filter>
+<clipPath id="cardclip"><rect x="128" y="132" width="216" height="276" rx="34"/></clipPath>
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
   <circle cx="90" cy="420" r="120" fill="#fff" opacity=".07"/>
   <circle cx="440" cy="70" r="90" fill="#fff" opacity=".07"/>
   <!-- back card -->
-  <g transform="rotate(-14 236 270)" filter="url(#sh)">
-    <rect x="128" y="132" width="216" height="276" rx="34" fill="url(#back)"/>
+  <g transform="translate(-40 6) rotate(-14 236 270)" filter="url(#sh)">
+    <g clip-path="url(#cardclip)">
+      <rect x="128" y="132" width="216" height="276" fill="#012169"/>
+      <path d="M128 132 L344 408 M344 132 L128 408" stroke="#fff" stroke-width="56"/>
+      <path d="M128 132 L344 408 M344 132 L128 408" stroke="#C8102E" stroke-width="20"/>
+      <path d="M236.0 132 V408 M128 270.0 H344" stroke="#fff" stroke-width="72"/>
+      <path d="M236.0 132 V408 M128 270.0 H344" stroke="#C8102E" stroke-width="40"/>
+    </g>
+    <rect x="128" y="132" width="216" height="276" rx="34" fill="none" stroke="#fff" stroke-width="8"/>
   </g>
   <!-- front card -->
-  <g transform="rotate(7 276 262)" filter="url(#sh)">
+  <g transform="translate(34 4) rotate(9 276 262)" filter="url(#sh)">
     <rect x="168" y="118" width="216" height="276" rx="34" fill="#fff"/>
     <text x="276" y="292" font-family="Nunito, Arial Rounded MT Bold, Arial, sans-serif" font-weight="900" font-size="132" text-anchor="middle" fill="#6d28d9">Aa</text>
     <rect x="216" y="326" width="120" height="16" rx="8" fill="#ddd6fe"/>
   </g>
   <!-- sparkle -->
-  <path d="M408 132 L420 168 L456 180 L420 192 L408 228 L396 192 L360 180 L396 168 Z" fill="#fde047" stroke="#fff" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M420 92 L432 128 L468 140 L432 152 L420 188 L408 152 L372 140 L408 128 Z" fill="#fde047" stroke="#fff" stroke-width="6" stroke-linejoin="round"/>
 </svg>
