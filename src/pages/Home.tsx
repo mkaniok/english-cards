@@ -103,7 +103,7 @@ export default function Home() {
         )
       })}
 
-      <div className="sticky bottom-24 z-10 sm:bottom-4">
+      <div className="sticky bottom-24 z-10 md:bottom-4">
         <button className="btn-primary w-full text-xl" disabled={!s.total} onClick={() => navigate('/practice')}>
           {s.total ? `Procvičovat (${s.learned}/${s.total} naučeno) 🚀` : 'Vyber aspoň jednu lekci'}
         </button>
