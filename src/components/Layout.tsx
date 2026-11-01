@@ -20,7 +20,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     <div className="mx-auto flex min-h-dvh max-w-3xl flex-col px-4 pb-28 pt-4 md:pb-10">
       <header className="mb-4 flex items-center gap-3">
         <NavLink to="/" className="flex shrink-0 items-center gap-2 whitespace-nowrap text-2xl font-black tracking-tight text-violet-700 dark:text-violet-300">
-          <img src="/icon.svg" alt="" className="h-9 w-9" /> Kartičky
+          <img src="/icon-192.png" alt="" className="h-9 w-9" /> Kartičky
         </NavLink>
         <nav className="ml-2 hidden shrink-0 gap-1 md:flex">
           {nav.map(n => (

@@ -43,7 +43,7 @@ export default function Login() {
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-8">
       <button onClick={toggle} className="btn-soft absolute right-4 top-4 !px-3 !py-2 text-lg" aria-label="Přepnout motiv">{dark ? '☀️' : '🌙'}</button>
       <div className="mb-6 text-center">
-        <img src="/icon.svg" alt="" className="pop mx-auto h-20 w-20" />
+        <img src="/icon-192.png" alt="" className="pop mx-auto h-20 w-20" />
         <h1 className="mt-3 text-4xl font-black text-violet-700 dark:text-violet-300">Kartičky</h1>
         <p className="mt-1 font-bold text-slate-500 dark:text-slate-400">Anglická slovíčka pro naši třídu</p>
       </div>
