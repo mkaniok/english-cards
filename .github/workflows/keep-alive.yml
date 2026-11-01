@@ -1,0 +1,16 @@
+# Supabase pauses free projects after 7 days without traffic (e.g. school holidays).
+# A tiny daily request keeps the database awake.
+name: Keep Supabase awake
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping database
+        run: |
+          curl -fsS -X POST "https://ldujkfiltxpilzeoznmy.supabase.co/rest/v1/rpc/ping" \
+            -H "apikey: sb_publishable_4Ao1q_ff8_n8Zjxas4ltww_fq1C1X1K" \
+            -H "Content-Type: application/json" -d '{}'

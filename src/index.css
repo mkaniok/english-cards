@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Nunito", ui-rounded, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+html { -webkit-tap-highlight-color: transparent; }
+body {
+  @apply min-h-dvh bg-violet-50 text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-100;
+  background-image: radial-gradient(circle at 10% 0%, rgb(196 181 253 / .35), transparent 40%),
+                    radial-gradient(circle at 100% 30%, rgb(253 186 116 / .25), transparent 35%);
+  background-attachment: fixed;
+}
+.dark body {
+  background-image: radial-gradient(circle at 10% 0%, rgb(76 29 149 / .45), transparent 45%),
+                    radial-gradient(circle at 100% 30%, rgb(15 118 110 / .25), transparent 40%);
+}
+
+@utility panel { @apply rounded-3xl bg-white/90 p-5 shadow-sm ring-1 ring-violet-100 backdrop-blur dark:bg-slate-900/80 dark:ring-slate-800; }
+@utility btn { @apply inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 font-extrabold transition active:scale-95 disabled:opacity-50 disabled:active:scale-100; }
+@utility btn-primary { @apply btn bg-violet-600 text-white shadow-[0_4px_0_#5b21b6] hover:bg-violet-500 active:shadow-none dark:bg-violet-500 dark:hover:bg-violet-400; }
+@utility btn-soft { @apply btn bg-violet-100 text-violet-800 hover:bg-violet-200 dark:bg-slate-800 dark:text-violet-200 dark:hover:bg-slate-700; }
+@utility btn-danger { @apply btn bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-950 dark:text-rose-300; }
+@utility input { @apply w-full rounded-2xl border-2 border-violet-100 bg-white px-4 py-3 text-lg font-bold outline-none transition focus:border-violet-500 dark:border-slate-700 dark:bg-slate-900 dark:focus:border-violet-400; }
+@utility label { @apply mb-1 block text-sm font-extrabold uppercase tracking-wide text-violet-700 dark:text-violet-300; }
+@utility chip { @apply inline-flex cursor-pointer select-none items-center gap-2 rounded-2xl border-2 px-3 py-2 font-bold transition; }
+
+/* Card flip */
+.flip { perspective: 1200px; }
+.flip-inner { transition: transform .45s cubic-bezier(.2,.8,.2,1); transform-style: preserve-3d; }
+.flip-inner.flipped { transform: rotateY(180deg); }
+.flip-face { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.flip-back { transform: rotateY(180deg); }
+
+@keyframes pop { 0% { transform: scale(.6); opacity: 0 } 60% { transform: scale(1.08) } 100% { transform: scale(1); opacity: 1 } }
+.pop { animation: pop .35s ease-out both; }
+@keyframes confetti { to { transform: translateY(110vh) rotate(720deg); } }
+.confetti-piece { position: fixed; top: -20px; width: 10px; height: 14px; border-radius: 3px; animation: confetti linear forwards; pointer-events: none; z-index: 50; }
+
+@media (prefers-reduced-motion: reduce) {
+  .flip-inner, .pop, .confetti-piece { transition: none; animation: none; }
+}
