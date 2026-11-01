@@ -1,12 +1,12 @@
-import { useMemo } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { useData } from '../lib/data'
 import { dirsOf, useSelection, type DirMode } from '../lib/selection'
 import { isLearned } from '../lib/practice'
-import { pkey } from '../lib/types'
+import { pkey, type Lesson } from '../lib/types'
 import ProgressBar from '../components/ProgressBar'
-import { cardsWord } from '../lib/plural'
+import { cardsWord, plural } from '../lib/plural'
 
 const DIRS: { id: DirMode; label: string; hint: string }[] = [
   { id: 'en', label: '🇬🇧 → 🇨🇿', hint: 'Anglicky → česky' },
@@ -46,6 +46,54 @@ export default function Home() {
     setSel(v => ({ ...v, lessons: all ? v.lessons.filter(x => !ids.includes(x)) : [...new Set([...v.lessons, ...ids])] }))
   }
 
+  const [open, setOpen] = useState<Set<string>>(() => new Set())
+  const toggleOpen = (key: string) => setOpen(o => { const n = new Set(o); if (n.has(key)) n.delete(key); else n.add(key); return n })
+
+  const LessonTile = ({ lesson: l, nested }: { lesson: Lesson; nested?: boolean }) => {
+    const n = byLesson.get(l.id)?.length ?? 0
+    const st = stat([l.id])
+    const on = sel.lessons.includes(l.id)
+    const { code, name } = splitTitle(l.title)
+    return (
+      <button disabled={!n} onClick={() => toggle(l.id)}
+        className={`w-full rounded-2xl border-2 p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${on ? 'border-violet-500 bg-violet-50 dark:border-violet-400 dark:bg-violet-950/40' : 'border-violet-100 bg-white hover:border-violet-300 dark:border-slate-700 dark:bg-slate-900'} ${nested ? '!py-2' : ''}`}>
+        <div className="flex items-center gap-2 font-extrabold">
+          <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-lg text-sm ${on ? 'bg-violet-600 text-white' : 'bg-violet-100 dark:bg-slate-800'}`}>{on ? '✓' : ''}</span>
+          {code && <span className="shrink-0 rounded-lg bg-amber-100 px-2 py-0.5 text-sm font-black text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">{code}</span>}
+          <span className="flex-1">{name}</span>
+          <span className="shrink-0 text-sm text-slate-500">{n ? cardsWord(n) : 'prázdná'}</span>
+        </div>
+        {n > 0 && <ProgressBar className="mt-2 !h-2" value={st.learned} max={st.total} />}
+      </button>
+    )
+  }
+
+  const UnitGroup = ({ unit, ids, children }: { unit: string; ids: string[]; children: ReactNode }) => {
+    const usable = ids.filter(id => (byLesson.get(id)?.length ?? 0) > 0)
+    const chosen = usable.filter(id => sel.lessons.includes(id)).length
+    const all = usable.length > 0 && chosen === usable.length
+    const expanded = open.has(unit)
+    const st = stat(usable)
+    const cards = usable.reduce((a, id) => a + (byLesson.get(id)?.length ?? 0), 0)
+    return (
+      <div className={`rounded-2xl border-2 ${chosen ? 'border-violet-300 dark:border-violet-700' : 'border-violet-100 dark:border-slate-700'}`}>
+        <div className="flex items-center gap-2 p-3">
+          <button onClick={() => toggleBook(usable)} disabled={!usable.length} aria-label={all ? 'Zrušit výběr lekce' : 'Vybrat celou lekci'}
+            className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg text-sm font-black ${all ? 'bg-violet-600 text-white' : chosen ? 'bg-violet-300 text-white dark:bg-violet-700' : 'bg-violet-100 dark:bg-slate-800'}`}>
+            {all ? '✓' : chosen ? '–' : ''}
+          </button>
+          <button onClick={() => toggleOpen(unit)} className="flex flex-1 items-center gap-2 text-left" aria-expanded={expanded}>
+            <span className="text-lg font-black">Lekce {unit}</span>
+            <span className="text-sm font-bold text-slate-500">{chosen ? `vybráno ${chosen} z ${usable.length}` : `${plural(usable.length, 'část', 'části', 'částí')} · ${cardsWord(cards)}`}</span>
+            <span className={`ml-auto text-slate-400 transition ${expanded ? 'rotate-90' : ''}`}>▶</span>
+          </button>
+        </div>
+        <ProgressBar className="mx-3 mb-3 !h-2" value={st.learned} max={st.total} />
+        {expanded && <div className="space-y-2 border-t-2 border-violet-100 p-3 pl-6 dark:border-slate-800 sm:pl-10">{children}</div>}
+      </div>
+    )
+  }
+
   if (loading) return <p className="panel text-center font-bold">Načítám kartičky…</p>
   if (error) return <p className="panel text-center font-bold text-rose-600">{error}</p>
 
@@ -81,23 +129,14 @@ export default function Home() {
                 </button>
               )}
             </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {ls.map(l => {
-                const n = byLesson.get(l.id)?.length ?? 0
-                const st = stat([l.id])
-                const on = sel.lessons.includes(l.id)
-                return (
-                  <button key={l.id} disabled={!n} onClick={() => toggle(l.id)}
-                    className={`rounded-2xl border-2 p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${on ? 'border-violet-500 bg-violet-50 dark:border-violet-400 dark:bg-violet-950/40' : 'border-violet-100 bg-white hover:border-violet-300 dark:border-slate-700 dark:bg-slate-900'}`}>
-                    <div className="flex items-center gap-2 font-extrabold">
-                      <span className={`grid h-6 w-6 place-items-center rounded-lg text-sm ${on ? 'bg-violet-600 text-white' : 'bg-violet-100 dark:bg-slate-800'}`}>{on ? '✓' : ''}</span>
-                      <span className="flex-1">{l.title}</span>
-                      <span className="text-sm text-slate-500">{n ? cardsWord(n) : 'zatím prázdná'}</span>
-                    </div>
-                    {n > 0 && <ProgressBar className="mt-2" value={st.learned} max={st.total} />}
-                  </button>
-                )
-              })}
+            <div className="space-y-2">
+              {groupLessons(ls).map(g => g.unit === null ? (
+                <LessonTile key={g.lessons[0].id} lesson={g.lessons[0]} />
+              ) : (
+                <UnitGroup key={g.unit} unit={g.unit} ids={g.lessons.map(l => l.id)}>
+                  {g.lessons.map(l => <LessonTile key={l.id} lesson={l} nested />)}
+                </UnitGroup>
+              ))}
             </div>
           </section>
         )
@@ -110,4 +149,23 @@ export default function Home() {
       </div>
     </div>
   )
+}
+
+/** "1A – At home" -> code "1A", name "At home"; titles without a number stay whole. */
+function splitTitle(title: string) {
+  const m = title.match(/^(\d+[A-Za-z]?)\s*[–-]\s*(.+)$/)
+  return m ? { code: m[1], name: m[2] } : { code: '', name: title }
+}
+
+/** Groups lessons whose titles start with the same number (1A, 1B, 1 – Data → unit 1), keeping order. */
+function groupLessons(ls: Lesson[]) {
+  const groups: { unit: string | null; lessons: Lesson[] }[] = []
+  for (const l of ls) {
+    const unit = l.title.match(/^(\d+)/)?.[1] ?? null
+    const existing = unit ? groups.find(g => g.unit === unit) : undefined
+    if (existing) existing.lessons.push(l)
+    else if (unit) groups.push({ unit, lessons: [l] })
+    else groups.push({ unit: null, lessons: [l] })
+  }
+  return groups
 }
