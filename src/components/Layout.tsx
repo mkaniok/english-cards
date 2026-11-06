@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { useTheme } from '../lib/theme'
+import { ROLE_ICON, isAdminRole } from '../lib/types'
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { profile, signOut } = useAuth()
@@ -12,7 +13,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     { to: '/', icon: '🎯', label: 'Procvičovat' },
     { to: '/stats', icon: '📈', label: 'Statistiky' },
     { to: '/cards', icon: editor ? '🗂️' : '💡', label: editor ? 'Kartičky' : 'Navrhnout' },
-    ...(editor ? [{ to: '/class', icon: '👩‍🏫', label: profile?.role === 'admin' ? 'Třídy' : 'Třída' }] : []),
+    ...(editor ? [{ to: '/class', icon: '👩‍🏫', label: isAdminRole(profile?.role) ? 'Třídy' : 'Třída' }] : []),
   ]
   const practicing = pathname === '/practice'
 
@@ -32,7 +33,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <span className="hidden max-w-32 truncate rounded-xl bg-white/70 px-3 py-2 text-sm font-extrabold dark:bg-slate-800 lg:inline" title="Přihlášený uživatel">
-            {profile?.role === 'admin' ? '👑 ' : profile?.role === 'editor' ? '✏️ ' : '🙂 '}{profile?.nickname}
+            {profile ? ROLE_ICON[profile.role] + ' ' : ''}{profile?.nickname}
           </span>
           <button onClick={toggle} className="btn-soft !px-3 !py-2 text-lg" aria-label={dark ? 'Světlý motiv' : 'Tmavý motiv'} title={dark ? 'Světlý motiv' : 'Tmavý motiv'}>
             {dark ? '☀️' : '🌙'}
