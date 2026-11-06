@@ -2,8 +2,8 @@
 // Each pupil gets an internal Supabase Auth user with a synthetic address that is never mailed.
 // Actions:
 //   register  { classCode, nickname, pin }            -> creates the account (no auth needed)
-//   reset_pin { userId, pin }                         -> admin only, same class
-//   remove    { userId }                              -> admin only, same class
+//   reset_pin { userId, pin }                         -> admin only (admins manage every class)
+//   remove    { userId }                              -> admin only (admins manage every class)
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const cors = {
@@ -29,7 +29,7 @@ async function callerAdmin(req: Request) {
   if (!token) return null;
   const { data } = await admin.auth.getUser(token);
   if (!data.user) return null;
-  const { data: p } = await admin.from("profiles").select("id, class_id, role").eq("id", data.user.id).single();
+  const { data: p } = await admin.from("profiles").select("id, role").eq("id", data.user.id).single();
   return p && p.role === "admin" ? p : null;
 }
 
@@ -79,8 +79,8 @@ Deno.serve(async (req) => {
   if (body.action === "reset_pin" || body.action === "remove") {
     const me = await callerAdmin(req);
     if (!me) return json({ error: "Jen pro admina." }, 403);
-    const { data: target } = await admin.from("profiles").select("id, class_id, login_slug").eq("id", body.userId).maybeSingle();
-    if (!target || target.class_id !== me.class_id) return json({ error: "Uživatel nenalezen." }, 404);
+    const { data: target } = await admin.from("profiles").select("id, login_slug").eq("id", body.userId).maybeSingle();
+    if (!target) return json({ error: "Uživatel nenalezen." }, 404);
 
     if (body.action === "remove") {
       if (target.id === me.id) return json({ error: "Sám sebe smazat nejde." }, 400);

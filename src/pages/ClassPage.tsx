@@ -1,35 +1,57 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useAuth } from '../lib/auth'
 import { useData } from '../lib/data'
 import { callFunction, fetchAll, supabase } from '../lib/supabase'
 import { relTime } from '../lib/dates'
-import { LEARNED, type Answer, type Profile, type Progress, type Role } from '../lib/types'
+import {
+  CLASS_COLS, LEARNED, classLabel, currentSchoolYear, schoolYear,
+  type Answer, type ClassInfo, type Profile, type Progress, type Role,
+} from '../lib/types'
 import Tile from '../components/Tile'
 import DayChart from '../components/DayChart'
 import { plural } from '../lib/plural'
 
 const ROLE_LABEL: Record<Role, string> = { student: '🙂 žák', editor: '✏️ editor', admin: '👑 admin' }
+const PICKED = 'ec.class'
 
 export default function ClassPage() {
-  const { profile, klass } = useAuth()
+  const { profile, klass: myClass } = useAuth()
   const { cards } = useData()
   const isAdmin = profile?.role === 'admin'
+  // Admins (teachers) manage every class; editors only see their own.
+  const [classes, setClasses] = useState<ClassInfo[]>([])
+  const [picked, setPicked] = useState<string | null>(() => localStorage.getItem(PICKED))
+  const klass = (isAdmin && classes.find(c => c.id === picked)) || myClass
   const [people, setPeople] = useState<Profile[]>([])
   const [progress, setProgress] = useState<Pick<Progress, 'user_id' | 'card_id' | 'level'>[]>([])
   const [answers, setAnswers] = useState<Answer[]>([])
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
 
+  const loadClasses = useCallback(async () => {
+    if (!isAdmin) return
+    const { data } = await supabase.from('classes').select(CLASS_COLS)
+      .order('school_year', { ascending: false }).order('grade').order('letter')
+    setClasses((data ?? []) as ClassInfo[])
+  }, [isAdmin])
+  useEffect(() => { loadClasses() }, [loadClasses])
+
+  const pick = (id: string) => { setPicked(id); localStorage.setItem(PICKED, id) }
+
+  const classId = klass?.id
   const load = useCallback(async () => {
+    if (!classId) return
     const since = new Date(Date.now() - 30 * 86400e3).toISOString()
-    const [p, pr, an] = await Promise.all([
-      supabase.from('profiles').select('id, class_id, nickname, role, created_at').order('nickname'),
-      fetchAll<Pick<Progress, 'user_id' | 'card_id' | 'level'>>((a, b) => supabase.from('progress').select('user_id, card_id, level').range(a, b)),
-      fetchAll<Answer>((a, b) => supabase.from('answers').select('user_id, card_id, dir, grade, answered_at').gte('answered_at', since).range(a, b)),
-    ])
-    setPeople((p.data ?? []) as Profile[])
+    const p = await supabase.from('profiles').select('id, class_id, nickname, role, created_at').eq('class_id', classId).order('nickname')
+    const members = (p.data ?? []) as Profile[]
+    const ids = members.map(m => m.id)
+    const [pr, an] = ids.length ? await Promise.all([
+      fetchAll<Pick<Progress, 'user_id' | 'card_id' | 'level'>>((a, b) => supabase.from('progress').select('user_id, card_id, level').in('user_id', ids).range(a, b)),
+      fetchAll<Answer>((a, b) => supabase.from('answers').select('user_id, card_id, dir, grade, answered_at').in('user_id', ids).gte('answered_at', since).range(a, b)),
+    ]) : [[], []]
+    setPeople(members)
     setProgress(pr); setAnswers(an); setLoading(false)
-  }, [])
+  }, [classId])
   useEffect(() => { load() }, [load])
 
   const perUser = useMemo(() => {
@@ -58,12 +80,16 @@ export default function ClassPage() {
   }, [answers, cards])
 
   const activeWeek = [...perUser.values()].filter(u => u.week > 0).length
-  const share = `Kartičky – anglická slovíčka\n${location.origin}\nKód třídy: ${klass?.code}`
+  const share = `Kartičky – anglická slovíčka\n${location.origin}\nTřída: ${klass ? classLabel(klass) : ''}\nKód třídy: ${klass?.code}`
 
   if (loading) return <p className="panel text-center font-bold">Načítám třídu…</p>
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-black">👩‍🏫 Třída {klass?.name}</h1>
+      {isAdmin && klass && (
+        <ClassPicker classes={classes} current={klass} onPick={pick}
+          onSaved={async id => { await loadClasses(); if (id) pick(id) }} />
+      )}
+      <h1 className="text-2xl font-black">👩‍🏫 Třída {klass?.name} <span className="text-slate-500 dark:text-slate-400">{klass && schoolYear(klass.school_year)}</span></h1>
 
       <section className="panel flex flex-wrap items-center gap-4">
         <div>
@@ -168,5 +194,93 @@ function Member({ p, me, isAdmin, stats, onChange }: {
       )}
       {msg && <p className="mt-1 text-sm font-bold text-violet-700 dark:text-violet-300">{msg}</p>}
     </li>
+  )
+}
+
+/** Teacher's class switcher with "new class" and "edit class" forms. */
+function ClassPicker({ classes, current, onPick, onSaved }: {
+  classes: ClassInfo[]; current: ClassInfo; onPick: (id: string) => void; onSaved: (id?: string) => Promise<void>
+}) {
+  const [form, setForm] = useState<'' | 'new' | 'edit'>('')
+  const years = [...new Set(classes.map(c => c.school_year))]
+  return (
+    <section className="panel space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="label !mb-0 mr-auto">Třídy</h2>
+        <button className="btn-soft !px-3 !py-2 text-sm" onClick={() => setForm(form === 'edit' ? '' : 'edit')}>✏️ Upravit {current.name}</button>
+        <button className="btn-primary !px-3 !py-2 text-sm" onClick={() => setForm(form === 'new' ? '' : 'new')}>➕ Nová třída</button>
+      </div>
+      {years.map(y => (
+        <div key={y}>
+          <div className="mb-1 text-sm font-bold text-slate-500 dark:text-slate-400">Školní rok {schoolYear(y)}</div>
+          <div className="flex flex-wrap gap-2">
+            {classes.filter(c => c.school_year === y).map(c => (
+              <button key={c.id} onClick={() => { onPick(c.id); setForm('') }}
+                className={`rounded-xl px-3 py-2 font-extrabold transition ${c.id === current.id ? 'bg-violet-600 text-white' : 'bg-violet-100 text-violet-700 hover:bg-violet-200 dark:bg-slate-800 dark:text-violet-300'}`}>
+                {c.name} <span className="ml-1 font-mono text-xs opacity-75">{c.code}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+      {form && (
+        <ClassForm key={form + current.id} edit={form === 'edit' ? current : null}
+          onDone={async id => { setForm(''); await onSaved(id) }} onCancel={() => setForm('')} />
+      )}
+    </section>
+  )
+}
+
+function ClassForm({ edit, onDone, onCancel }: { edit: ClassInfo | null; onDone: (id?: string) => Promise<void>; onCancel: () => void }) {
+  const now = currentSchoolYear()
+  const [grade, setGrade] = useState(edit?.grade ?? 6)
+  const [letter, setLetter] = useState(edit?.letter ?? '')
+  const [year, setYear] = useState(edit?.school_year ?? now)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const yearOptions = [...new Set([now - 1, now, now + 1, year])].sort()
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    const l = letter.trim().toUpperCase()
+    if (!/^[A-Z]{1,2}$/.test(l)) return setError('Písmeno třídy: jedno nebo dvě písmena bez háčků, např. A.')
+    setBusy(true); setError('')
+    const row = { grade, letter: l, school_year: year }
+    const { data, error: err } = edit
+      ? await supabase.from('classes').update(row).eq('id', edit.id).select('id').single()
+      : await supabase.from('classes').insert(row).select('id').single()
+    setBusy(false)
+    if (err) return setError(err.code === '23505' ? `Třída ${grade}. ${l} ${schoolYear(year)} už existuje.` : 'Uložení se nepovedlo.')
+    await onDone(data?.id)
+  }
+
+  const field = 'rounded-xl border-2 border-violet-100 bg-white px-3 py-2 font-bold dark:border-slate-700 dark:bg-slate-900'
+  return (
+    <form onSubmit={submit} className="space-y-3 rounded-2xl bg-violet-50 p-3 dark:bg-slate-800/60">
+      <div className="font-extrabold">{edit ? `Upravit třídu ${classLabel(edit)}` : 'Nová třída'}</div>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="text-sm font-bold">Ročník<br />
+          <select className={field} value={grade} onChange={e => setGrade(Number(e.target.value))}>
+            {Array.from({ length: 9 }, (_, i) => i + 1).map(g => <option key={g} value={g}>{g}.</option>)}
+          </select>
+        </label>
+        <label className="text-sm font-bold">Písmeno<br />
+          <input className={`${field} w-20 uppercase`} value={letter} maxLength={2} onChange={e => setLetter(e.target.value.toUpperCase())} placeholder="A" required />
+        </label>
+        <label className="text-sm font-bold">Školní rok<br />
+          <select className={field} value={year} onChange={e => setYear(Number(e.target.value))}>
+            {yearOptions.map(y => <option key={y} value={y}>{schoolYear(y)}</option>)}
+          </select>
+        </label>
+        <button className="btn-primary !py-2" disabled={busy}>{busy ? 'Ukládám…' : edit ? 'Uložit' : 'Vytvořit'}</button>
+        <button type="button" className="btn-soft !py-2" onClick={onCancel}>Zrušit</button>
+      </div>
+      <p className="text-sm text-slate-500 dark:text-slate-400">
+        {edit
+          ? 'Kód třídy zůstává stejný, žáci se dál přihlašují jako dřív. Takhle jde třídu na konci roku posunout do dalšího ročníku.'
+          : 'Kód pro žáky se vytvoří sám a uvidíš ho v seznamu tříd.'}
+      </p>
+      {error && <p className="rounded-2xl bg-rose-100 px-4 py-2 font-bold text-rose-700 dark:bg-rose-950 dark:text-rose-300" role="alert">{error}</p>}
+    </form>
   )
 }
