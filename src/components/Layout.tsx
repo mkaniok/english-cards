@@ -12,7 +12,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     { to: '/', icon: '🎯', label: 'Procvičovat' },
     { to: '/stats', icon: '📈', label: 'Statistiky' },
     { to: '/cards', icon: editor ? '🗂️' : '💡', label: editor ? 'Kartičky' : 'Navrhnout' },
-    ...(editor ? [{ to: '/class', icon: '👩‍🏫', label: 'Třída' }] : []),
+    ...(editor ? [{ to: '/class', icon: '👩‍🏫', label: profile?.role === 'admin' ? 'Třídy' : 'Třída' }] : []),
   ]
   const practicing = pathname === '/practice'
 

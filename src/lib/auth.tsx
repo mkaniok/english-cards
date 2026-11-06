@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import type { Session } from '@supabase/supabase-js'
 import { supabase, callFunction } from './supabase'
 import { emailFor, passwordFor } from './pupil'
-import type { ClassInfo, Profile } from './types'
+import { CLASS_COLS, type ClassInfo, type Profile } from './types'
 
 interface AuthState {
   loading: boolean
@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: p } = await supabase.from('profiles').select('id, class_id, nickname, role, created_at').eq('id', s.user.id).maybeSingle()
     setProfile(p as Profile | null)
     if (p) {
-      const { data: c } = await supabase.from('classes').select('id, name, code').eq('id', p.class_id).maybeSingle()
+      const { data: c } = await supabase.from('classes').select(CLASS_COLS).eq('id', p.class_id).maybeSingle()
       setKlass(c as ClassInfo | null)
     }
   }, [])

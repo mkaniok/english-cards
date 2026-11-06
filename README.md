@@ -6,7 +6,9 @@ Zdarma na Vercelu (hosting), Supabase (databáze, přihlášení, funkce) a GitH
 ## Co umí
 
 - Přihlášení **kódem třídy + přezdívkou + PINem**, bez e-mailu a osobních údajů.
-- Role: **žák** (procvičuje, navrhuje kartičky), **editor** (spravuje kartičky a lekce), **admin** (navíc role, PINy, odebírání).
+- Role: **žák** (procvičuje, navrhuje kartičky), **editor** (spravuje kartičky a lekce, vidí svou třídu), **admin** = učitel (navíc role, PINy, odebírání).
+- **Více tříd**: třída je ročník + písmeno + školní rok (např. 6. D 2026/2027). Admin zakládá třídy, vidí kódy a statistiky všech tříd
+  a na konci roku může třídu posunout do dalšího ročníku (kód zůstává, žáci se přihlašují dál). Kartičky a lekce jsou společné.
 - Procvičování po lekcích, směr EN→CZ / CZ→EN / mix, tlačítka **Nevěděl / Napůl / Věděl**, výslovnost en-GB.
   Kartička je naučená po 3× „Věděl“ za sebou; „Napůl“ úroveň nemění, „Nevěděl“ ji vrátí na nulu.
 - Přidávání kartiček s **kontrolou gramatiky** (LanguageTool, en-GB), upozornění na duplicity, hromadný import.
