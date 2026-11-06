@@ -210,7 +210,7 @@ function ClassPicker({ classes, current, onPick, onSaved }: {
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="label !mb-0 mr-auto">Třídy</h2>
         <button className="btn-soft !px-3 !py-2 text-sm" onClick={() => setForm(form === 'edit' ? '' : 'edit')}>✏️ Upravit {current.name}</button>
-        <button className="btn-primary !px-3 !py-2 text-sm" onClick={() => setForm(form === 'new' ? '' : 'new')}>➕ Nová třída</button>
+        <button className="btn-primary !px-3 !py-2 text-sm" onClick={() => setForm(form === 'new' ? '' : 'new')}><span aria-hidden="true" className="mr-1 font-black">+</span>Nová třída</button>
       </div>
       {years.map(y => (
         <div key={y}>
