@@ -4,20 +4,22 @@ import { useData } from '../lib/data'
 import { callFunction, fetchAll, supabase } from '../lib/supabase'
 import { relTime } from '../lib/dates'
 import {
-  CLASS_COLS, LEARNED, classLabel, currentSchoolYear, schoolYear,
+  CLASS_COLS, LEARNED, ROLE_ICON, classLabel, isAdminRole, currentSchoolYear, schoolYear,
   type Answer, type ClassInfo, type Profile, type Progress, type Role,
 } from '../lib/types'
 import Tile from '../components/Tile'
 import DayChart from '../components/DayChart'
 import { plural } from '../lib/plural'
 
-const ROLE_LABEL: Record<Role, string> = { student: '🙂 žák', editor: '✏️ editor', admin: '👑 admin' }
+const ROLE_NAME: Record<Role, string> = { student: 'žák', editor: 'editor', admin: 'admin', superadmin: 'super admin' }
+const roleLabel = (r: Role) => `${ROLE_ICON[r]} ${ROLE_NAME[r]}`
 const PICKED = 'ec.class'
 
 export default function ClassPage() {
   const { profile, klass: myClass } = useAuth()
   const { cards } = useData()
-  const isAdmin = profile?.role === 'admin'
+  const isAdmin = isAdminRole(profile?.role)
+  const isSuper = profile?.role === 'superadmin'
   // Admins (teachers) manage every class; editors only see their own.
   const [classes, setClasses] = useState<ClassInfo[]>([])
   const [picked, setPicked] = useState<string | null>(() => localStorage.getItem(PICKED))
@@ -116,7 +118,7 @@ export default function ClassPage() {
       <section className="panel">
         <h2 className="label">Členové</h2>
         <ul className="divide-y divide-violet-100 dark:divide-slate-800">
-          {people.map(p => <Member key={p.id} p={p} me={p.id === profile?.id} isAdmin={isAdmin} stats={perUser.get(p.id)} onChange={load} />)}
+          {people.map(p => <Member key={p.id} p={p} me={p.id === profile?.id} isAdmin={isAdmin} isSuper={isSuper} stats={perUser.get(p.id)} onChange={load} />)}
         </ul>
       </section>
 
@@ -138,8 +140,8 @@ export default function ClassPage() {
   )
 }
 
-function Member({ p, me, isAdmin, stats, onChange }: {
-  p: Profile; me: boolean; isAdmin: boolean; onChange: () => void
+function Member({ p, me, isAdmin, isSuper, stats, onChange }: {
+  p: Profile; me: boolean; isAdmin: boolean; isSuper: boolean; onChange: () => void
   stats?: { learned: Set<string>; week: number; knew: number; last: string | null }
 }) {
   const [mode, setMode] = useState<'' | 'pin' | 'remove'>('')
@@ -169,15 +171,15 @@ function Member({ p, me, isAdmin, stats, onChange }: {
             ⭐ {stats?.learned.size ?? 0} naučeno · 🃏 {stats?.week ?? 0} za týden{stats?.week ? ` (${Math.round((stats.knew / stats.week) * 100)} %)` : ''} · {relTime(stats?.last ?? null)}
           </div>
         </div>
-        {isAdmin && !me ? (
+        {isAdmin && !me && (isSuper || p.role !== 'superadmin') ? (
           <>
             <select className="rounded-xl border-2 border-violet-100 bg-white px-2 py-2 text-sm font-bold dark:border-slate-700 dark:bg-slate-900" value={p.role} onChange={e => setRole(e.target.value as Role)}>
-              {(Object.keys(ROLE_LABEL) as Role[]).map(r => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+              {(Object.keys(ROLE_NAME) as Role[]).filter(r => isSuper || r !== 'superadmin').map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
             </select>
             <button className="btn-soft !px-3 !py-2 text-sm" onClick={() => setMode(mode === 'pin' ? '' : 'pin')}>🔑 PIN</button>
             <button className="btn-soft !px-3 !py-2 text-sm" onClick={() => setMode(mode === 'remove' ? '' : 'remove')} aria-label="Odebrat">🗑️</button>
           </>
-        ) : <span className="text-sm font-bold">{ROLE_LABEL[p.role]}</span>}
+        ) : <span className="text-sm font-bold">{roleLabel(p.role)}</span>}
       </div>
       {mode === 'pin' && (
         <div className="mt-2 flex gap-2">
