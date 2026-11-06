@@ -24,3 +24,7 @@ export interface Answer { user_id: string; card_id: string; dir: Dir; grade: Gra
 
 export const LEARNED = 3
 export const pkey = (cardId: string, dir: Dir) => `${dir}|${cardId}`
+export interface BugReport {
+  id: string; user_id: string; message: string; page: string; device: string; errors: string
+  status: 'new' | 'done'; created_at: string; resolved_at: string | null
+}

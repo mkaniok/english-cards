@@ -13,6 +13,8 @@ Zdarma na Vercelu (hosting), Supabase (databáze, přihlášení, funkce) a GitH
   Kartička je naučená po 3× „Věděl“ za sebou; „Napůl“ úroveň nemění, „Nevěděl“ ji vrátí na nulu.
 - Přidávání kartiček s **kontrolou gramatiky** (LanguageTool, en-GB), upozornění na duplicity, hromadný import.
 - Statistiky žáka a přehled třídy (aktivita, nejtěžší slovíčka).
+- **Nahlásit chybu** (🐞 v horní liště): krátký formulář, automaticky přidá stránku, zařízení a poslední chybu z prohlížeče.
+  Hlášení vidí super admin v menu **Chyby** (označí jako vyřešené, smaže); autor vidí svá hlášení a jestli jsou vyřešená.
 - Světlý a tmavý motiv, funguje na mobilu i počítači, jde přidat na plochu telefonu.
 
 ## Struktura
