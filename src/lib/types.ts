@@ -1,4 +1,7 @@
-export type Role = 'student' | 'editor' | 'admin'
+export type Role = 'student' | 'editor' | 'admin' | 'superadmin'
+/** Admin rights: admins and the super admin (app owner, whom other admins cannot change). */
+export const isAdminRole = (r?: Role) => r === 'admin' || r === 'superadmin'
+export const ROLE_ICON: Record<Role, string> = { student: '🙂', editor: '✏️', admin: '👑', superadmin: '⭐' }
 export type Dir = 'en' | 'cz'
 export type Grade = 'knew' | 'partial' | 'unknown'
 
