@@ -8,6 +8,7 @@ import Practice from './pages/Practice'
 import Stats from './pages/Stats'
 import Cards from './pages/Cards'
 import ClassPage from './pages/ClassPage'
+import Bugs from './pages/Bugs'
 
 export default function App() {
   const { loading, session, profile } = useAuth()
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/stats" element={<Stats />} />
           <Route path="/cards" element={<Cards />} />
           {editor && <Route path="/class" element={<ClassPage />} />}
+          {profile.role === 'superadmin' && <Route path="/bugs" element={<Bugs />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
