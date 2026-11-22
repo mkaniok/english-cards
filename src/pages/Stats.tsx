@@ -46,7 +46,7 @@ export default function Stats() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-black">📈 Moje statistiky</h1>
+      <h1 className="text-2xl font-black">Moje statistiky</h1>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Tile icon="⭐" value={totalLearned} label="naučených kartiček" />
         <Tile icon="🔥" value={streakDays(days)} label="dní v řadě" />

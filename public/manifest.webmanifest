@@ -3,8 +3,8 @@
   "short_name": "Kartičky",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f5f3ff",
-  "theme_color": "#7c3aed",
+  "background_color": "#f7f5ff",
+  "theme_color": "#f7f5ff",
   "icons": [
     {
       "src": "/icon-192.png",

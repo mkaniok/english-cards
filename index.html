@@ -6,8 +6,11 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#7c3aed" />
+    <meta name="theme-color" content="#f7f5ff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b0a14" media="(prefers-color-scheme: dark)" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="Kartičky" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -17,9 +20,11 @@
     <script>
       // Apply the saved theme before first paint to avoid a flash.
       (function () {
-        var t = localStorage.getItem('ec.theme');
+        var t = null;
+        try { t = localStorage.getItem('ec.theme'); } catch (e) {}
         var dark = t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
         if (dark) document.documentElement.classList.add('dark');
+        if (t) document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.setAttribute('content', dark ? '#0b0a14' : '#f7f5ff'); });
       })();
     </script>
   </head>

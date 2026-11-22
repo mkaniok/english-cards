@@ -24,7 +24,7 @@ export default function Cards() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-black">{editor ? '🗂️ Kartičky a lekce' : '💡 Navrhnout kartičku'}</h1>
+      <h1 className="text-2xl font-black">{editor ? 'Kartičky a lekce' : 'Navrhnout kartičku'}</h1>
       {!editor && (
         <p className="panel font-bold text-slate-600 dark:text-slate-300">
           Chybí ti v lekci nějaké slovíčko? Navrhni ho. Jakmile ho správce zkontroluje a schválí, objeví se všem v procvičování.

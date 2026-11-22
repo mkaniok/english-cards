@@ -91,7 +91,7 @@ export default function ClassPage() {
         <ClassPicker classes={classes} current={klass} onPick={pick}
           onSaved={async id => { await loadClasses(); if (id) pick(id) }} />
       )}
-      <h1 className="text-2xl font-black">👩‍🏫 Třída {klass?.name} <span className="text-slate-500 dark:text-slate-400">{klass && schoolYear(klass.school_year)}</span></h1>
+      <h1 className="text-2xl font-black">Třída {klass?.name} <span className="text-slate-500 dark:text-slate-400">{klass && schoolYear(klass.school_year)}</span></h1>
 
       <section className="panel flex flex-wrap items-center gap-4">
         <div>

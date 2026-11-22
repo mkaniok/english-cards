@@ -1,195 +1,141 @@
-import { useMemo, useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { useData } from '../lib/data'
-import { dirsOf, useSelection, type DirMode } from '../lib/selection'
-import { isLearned } from '../lib/practice'
+import { useSelection } from '../lib/selection'
 import { MODES } from '../lib/exercise'
-import { pkey, type Lesson } from '../lib/types'
-import ProgressBar from '../components/ProgressBar'
-import { cardsWord, plural } from '../lib/plural'
-
-const DIRS: { id: DirMode; label: string; hint: string }[] = [
-  { id: 'en', label: '🇬🇧 → 🇨🇿', hint: 'Anglicky → česky' },
-  { id: 'cz', label: '🇨🇿 → 🇬🇧', hint: 'Česky → anglicky' },
-  { id: 'mix', label: '🔀 Mix', hint: 'Oba směry' },
-]
+import { dayKey, streakDays } from '../lib/dates'
+import { usePrefs } from '../lib/prefs'
+import { plural } from '../lib/plural'
+import { lessonTone, splitTitle, useLessonStats } from '../lib/lessons'
+import Icon from '../components/Icon'
+import Kbd from '../components/Kbd'
+import PracticeSheet, { dirLabel } from '../components/PracticeSheet'
 
 export default function Home() {
-  const { profile } = useAuth()
-  const { loading, error, textbooks, lessons, cards, levels } = useData()
+  const { profile, klass } = useAuth()
+  const { loading, error, lessons, activity } = useData()
   const [sel, setSel] = useSelection()
+  const [prefs] = usePrefs()
+  const [sheet, setSheet] = useState(false)
   const navigate = useNavigate()
-  const dirs = dirsOf(sel.dir, sel.mode)
-  const scramble = sel.mode === 'scramble'
+  const { stat } = useLessonStats(sel)
 
-  const approved = useMemo(() => cards.filter(c => c.status === 'approved'), [cards])
-  const byLesson = useMemo(() => {
-    const m = new Map<string, typeof approved>()
-    for (const c of approved) m.set(c.lesson_id, [...(m.get(c.lesson_id) ?? []), c])
-    return m
-  }, [approved])
-
-  const stat = (ids: string[]) => {
-    let total = 0, learned = 0
-    for (const id of ids) for (const c of byLesson.get(id) ?? []) for (const d of dirs) {
-      total++
-      if (isLearned(levels.get(pkey(c.id, d)))) learned++
+  const ready = !loading && sel.lessons.some(id => stat([id]).cards > 0)
+  // Computer: Enter starts practising straight away.
+  useEffect(() => {
+    if (!ready || sheet) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement || e.target instanceof HTMLAnchorElement || e.target instanceof HTMLInputElement)) navigate('/practice')
     }
-    return { total, learned }
-  }
-  const selected = sel.lessons.filter(id => (byLesson.get(id)?.length ?? 0) > 0)
-  const s = stat(selected)
-
-  const toggle = (id: string) =>
-    setSel(v => ({ ...v, lessons: v.lessons.includes(id) ? v.lessons.filter(x => x !== id) : [...v.lessons, id] }))
-  const toggleBook = (ids: string[]) => {
-    const all = ids.every(id => sel.lessons.includes(id))
-    setSel(v => ({ ...v, lessons: all ? v.lessons.filter(x => !ids.includes(x)) : [...new Set([...v.lessons, ...ids])] }))
-  }
-
-  const [open, setOpen] = useState<Set<string>>(() => new Set())
-  const toggleOpen = (key: string) => setOpen(o => { const n = new Set(o); if (n.has(key)) n.delete(key); else n.add(key); return n })
-
-  const LessonTile = ({ lesson: l, nested }: { lesson: Lesson; nested?: boolean }) => {
-    const n = byLesson.get(l.id)?.length ?? 0
-    const st = stat([l.id])
-    const on = sel.lessons.includes(l.id)
-    const { code, name } = splitTitle(l.title)
-    return (
-      <button disabled={!n} onClick={() => toggle(l.id)}
-        className={`w-full rounded-2xl border-2 p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${on ? 'border-violet-500 bg-violet-50 dark:border-violet-400 dark:bg-violet-950/40' : 'border-violet-100 bg-white hover:border-violet-300 dark:border-slate-700 dark:bg-slate-900'} ${nested ? '!py-2' : ''}`}>
-        <div className="flex items-center gap-2 font-extrabold">
-          <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-lg text-sm ${on ? 'bg-violet-600 text-white' : 'bg-violet-100 dark:bg-slate-800'}`}>{on ? '✓' : ''}</span>
-          {code && <span className="shrink-0 rounded-lg bg-amber-100 px-2 py-0.5 text-sm font-black text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">{code}</span>}
-          <span className="flex-1">{name}</span>
-          <span className="shrink-0 text-sm text-slate-500">{n ? cardsWord(n) : 'prázdná'}</span>
-        </div>
-        {n > 0 && <ProgressBar className="mt-2 !h-2" value={st.learned} max={st.total} />}
-      </button>
-    )
-  }
-
-  const UnitGroup = ({ unit, ids, children }: { unit: string; ids: string[]; children: ReactNode }) => {
-    const usable = ids.filter(id => (byLesson.get(id)?.length ?? 0) > 0)
-    const chosen = usable.filter(id => sel.lessons.includes(id)).length
-    const all = usable.length > 0 && chosen === usable.length
-    const expanded = open.has(unit)
-    const st = stat(usable)
-    const cards = usable.reduce((a, id) => a + (byLesson.get(id)?.length ?? 0), 0)
-    return (
-      <div className={`rounded-2xl border-2 ${chosen ? 'border-violet-300 dark:border-violet-700' : 'border-violet-100 dark:border-slate-700'}`}>
-        <div className="flex items-center gap-2 p-3">
-          <button onClick={() => toggleBook(usable)} disabled={!usable.length} aria-label={all ? 'Zrušit výběr lekce' : 'Vybrat celou lekci'}
-            className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg text-sm font-black ${all ? 'bg-violet-600 text-white' : chosen ? 'bg-violet-300 text-white dark:bg-violet-700' : 'bg-violet-100 dark:bg-slate-800'}`}>
-            {all ? '✓' : chosen ? '–' : ''}
-          </button>
-          <button onClick={() => toggleOpen(unit)} className="flex flex-1 items-center gap-2 text-left" aria-expanded={expanded}>
-            <span className="text-lg font-black">Lekce {unit}</span>
-            <span className="text-sm font-bold text-slate-500">{chosen ? `vybráno ${chosen} z ${usable.length}` : `${plural(usable.length, 'část', 'části', 'částí')} · ${cardsWord(cards)}`}</span>
-            <span className={`ml-auto text-slate-400 transition ${expanded ? 'rotate-90' : ''}`}>▶</span>
-          </button>
-        </div>
-        <ProgressBar className="mx-3 mb-3 !h-2" value={st.learned} max={st.total} />
-        {expanded && <div className="space-y-2 border-t-2 border-violet-100 p-3 pl-6 dark:border-slate-800 sm:pl-10">{children}</div>}
-      </div>
-    )
-  }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [ready, sheet, navigate])
 
   if (loading) return <p className="panel text-center font-bold">Načítám kartičky…</p>
   if (error) return <p className="panel text-center font-bold text-rose-600">{error}</p>
 
+  const chosen = lessons.filter(l => sel.lessons.includes(l.id) && stat([l.id]).cards > 0)
+  const s = stat(chosen.map(l => l.id))
+  const today = activity.get(dayKey(new Date())) ?? 0
+  const streak = streakDays(new Set(activity.keys()))
+  const goalDone = today >= prefs.goal
+  const title = chosen.length === 1 ? chosen[0].title.replace(/\s*[–-]\s*/, ' · ')
+    : chosen.length ? chosen.map(l => splitTitle(l.title).code || l.title).join(', ') : ''
+  const mode = MODES.find(m => m.id === sel.mode)
+
   return (
     <div className="space-y-4">
-      <section className="panel">
-        <h1 className="text-2xl font-black">Ahoj, {profile?.nickname}! 👋</h1>
-        <p className="font-bold text-slate-500 dark:text-slate-400">Vyber lekce a směr, a jdeme procvičovat.</p>
-      </section>
-
-      <section className="panel">
-        <h2 className="label">Směr</h2>
-        <div className="grid grid-cols-3 gap-2">
-          {DIRS.map(d => {
-            const on = scramble ? d.id === 'cz' : sel.dir === d.id
-            return (
-              <button key={d.id} onClick={() => setSel(v => ({ ...v, dir: d.id }))} title={d.hint} disabled={scramble}
-                className={`chip justify-center text-lg disabled:cursor-not-allowed ${on ? 'border-violet-600 bg-violet-600 text-white' : 'border-violet-100 bg-white dark:border-slate-700 dark:bg-slate-900'} ${scramble && !on ? 'opacity-40' : ''}`}>
-                {d.label}
-              </button>
-            )
-          })}
+      <header className="flex items-center gap-3">
+        <Link to="/profile" aria-label="Profil" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-violet-100 text-lg font-black text-violet-700 dark:bg-violet-950 dark:text-violet-200">
+          {profile?.nickname.slice(0, 1).toUpperCase()}
+        </Link>
+        <div className="min-w-0 flex-1">
+          {klass && <p className="text-sm font-bold text-slate-500 dark:text-slate-400">{klass.name}</p>}
+          <h1 className="truncate text-xl font-black">Ahoj, {profile?.nickname}!</h1>
         </div>
-        {scramble && <p className="mt-2 text-sm font-bold text-slate-500 dark:text-slate-400">Skládání z písmen je vždy česky → anglicky.</p>}
-      </section>
-
-      <section className="panel">
-        <h2 className="label">Cvičení</h2>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {MODES.map(m => {
-            const on = sel.mode === m.id
-            return (
-              <button key={m.id} onClick={() => setSel(v => ({ ...v, mode: m.id }))} title={m.hint} aria-pressed={on}
-                className={`flex flex-col items-center rounded-2xl border-2 px-2 py-2 text-center transition ${on ? 'border-violet-600 bg-violet-600 text-white' : 'border-violet-100 bg-white hover:border-violet-300 dark:border-slate-700 dark:bg-slate-900'}`}>
-                <span className="text-2xl">{m.emoji}</span>
-                <span className="font-extrabold leading-tight">{m.label}</span>
-                <span className={`text-xs font-bold ${on ? 'text-violet-100' : 'text-slate-500 dark:text-slate-400'}`}>{m.level || 'Sám se ohodnotíš'}</span>
-              </button>
-            )
-          })}
+        <div className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 font-black ${streak ? 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300' : 'bg-[#f1eefa] text-slate-500 dark:bg-slate-800'}`}
+          title="Kolik dní v řadě procvičuješ">
+          <Icon name="flame" size={20} className={streak ? 'text-orange-500' : ''} />{plural(streak, 'den', 'dny', 'dní')}
         </div>
-        <p className="mt-2 text-sm font-bold text-slate-500 dark:text-slate-400">{MODES.find(m => m.id === sel.mode)?.hint}</p>
-      </section>
+      </header>
 
-      {textbooks.map(tb => {
-        const ls = lessons.filter(l => l.textbook_id === tb.id)
-        const withCards = ls.filter(l => (byLesson.get(l.id)?.length ?? 0) > 0).map(l => l.id)
-        return (
-          <section key={tb.id} className="panel">
-            <div className="mb-3 flex items-center gap-2">
-              <h2 className="text-lg font-black">📘 {tb.title}</h2>
-              {withCards.length > 1 && (
-                <button className="ml-auto text-sm font-extrabold text-violet-600 hover:underline dark:text-violet-300" onClick={() => toggleBook(withCards)}>
-                  {withCards.every(id => sel.lessons.includes(id)) ? 'Zrušit vše' : 'Vybrat vše'}
-                </button>
-              )}
+      <div className="md:grid md:grid-cols-[2fr_1fr] md:gap-4 md:space-y-0 space-y-4">
+        {chosen.length ? (
+          <section className="rounded-[1.75rem] bg-violet-600 p-5 text-white shadow-[0_6px_0_#5b21b6] dark:bg-violet-700 dark:shadow-[0_6px_0_#4c1d95]">
+            <p className="text-xs font-black uppercase tracking-wider text-violet-100">Pokračuj, kde jsi skončil</p>
+            <h2 className="mt-1 text-2xl font-black leading-tight">{title}</h2>
+            <p className="mt-1 font-bold text-violet-100">{mode?.label} · {sel.mode === 'scramble' ? 'česky → anglicky' : dirLabel(sel.dir)}</p>
+            <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-white/25">
+              <div className="h-full rounded-full bg-white transition-all" style={{ width: `${s.total ? (s.learned / s.total) * 100 : 0}%` }} />
             </div>
-            <div className="space-y-2">
-              {groupLessons(ls).map(g => g.unit === null ? (
-                <LessonTile key={g.lessons[0].id} lesson={g.lessons[0]} />
-              ) : (
-                <UnitGroup key={g.unit} unit={g.unit} ids={g.lessons.map(l => l.id)}>
-                  {g.lessons.map(l => <LessonTile key={l.id} lesson={l} nested />)}
-                </UnitGroup>
-              ))}
+            <p className="mt-1.5 text-sm font-extrabold text-violet-100">{s.learned} z {s.total} naučeno</p>
+            <div className="mt-4 flex gap-2">
+              <button className="btn !min-h-14 flex-1 bg-white text-xl text-violet-700 shadow-[0_4px_0_#ddd6fe] hover:bg-violet-50 active:shadow-none" onClick={() => navigate('/practice')}>
+                Pokračovat<Kbd k="Enter" />
+              </button>
+              <button className="btn !min-h-14 !px-4 bg-white/15 text-white hover:bg-white/25" onClick={() => setSheet(true)} aria-label="Nastavení cvičení" title="Směr, typ cvičení, délka kola">
+                <Icon name="sliders" />
+              </button>
             </div>
           </section>
-        )
-      })}
+        ) : (
+          <section className="rounded-[1.75rem] bg-violet-600 p-5 text-white shadow-[0_6px_0_#5b21b6]">
+            <h2 className="text-2xl font-black">Vyber si první lekci</h2>
+            <p className="mt-1 font-bold text-violet-100">Pak tu bude tlačítko, kterým budeš pokračovat.</p>
+            <Link to="/lessons" className="btn mt-4 !min-h-14 w-full bg-white text-xl text-violet-700 shadow-[0_4px_0_#ddd6fe]">Vybrat lekce</Link>
+          </section>
+        )}
 
-      <div className="sticky bottom-24 z-10 md:bottom-4">
-        <button className="btn-primary w-full text-xl" disabled={!s.total} onClick={() => navigate('/practice')}>
-          {s.total ? `Procvičovat (${s.learned}/${s.total} naučeno) 🚀` : 'Vyber aspoň jednu lekci'}
-        </button>
+        <section className="panel flex items-center gap-4 !p-4">
+          <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full"
+            style={{ background: `conic-gradient(#10b981 0 ${Math.min(1, today / prefs.goal) * 100}%, var(--ring-rest, #e9e5f7) 0 100%)` }}>
+            <div className="grid h-[3.25rem] w-[3.25rem] place-items-center rounded-full bg-white text-sm font-black dark:bg-slate-900">
+              {goalDone ? <Icon name="check" className="text-emerald-500" stroke={3} /> : `${today}/${prefs.goal}`}
+            </div>
+          </div>
+          <div>
+            <h2 className="font-black">Dnešní cíl</h2>
+            <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
+              {goalDone ? 'Splněno! Můžeš pokračovat dál.' : `Ještě ${plural(prefs.goal - today, 'kartička', 'kartičky', 'kartiček')} a máš splněno.`}
+            </p>
+          </div>
+        </section>
       </div>
+
+      <section>
+        <div className="mb-2 mt-6 flex items-baseline">
+          <h2 className="flex-1 text-lg font-black">Moje lekce</h2>
+          <Link to="/lessons" className="font-extrabold text-violet-700 hover:underline dark:text-violet-300">Všechny lekce</Link>
+        </div>
+        {chosen.length ? (
+          <ul className="divide-y divide-[#f1eefa] overflow-hidden rounded-3xl bg-white shadow-[0_1px_0_#e9e5f7] dark:divide-slate-800 dark:bg-slate-900 dark:shadow-none md:grid md:grid-cols-2 md:divide-y-0">
+            {chosen.map(l => {
+              const st = stat([l.id])
+              const { code, name } = splitTitle(l.title)
+              const done = st.total > 0 && st.learned === st.total
+              return (
+                <li key={l.id}>
+                  <Link to="/lessons" className="flex min-h-16 items-center gap-3 px-4 py-3 hover:bg-violet-50 dark:hover:bg-slate-800">
+                    <span className={`grid h-10 min-w-10 place-items-center rounded-xl px-1 text-sm font-black ${lessonTone(st)}`}>{code || name.slice(0, 2)}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-extrabold">{name}</span>
+                      <span className={`block text-sm font-bold ${done ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                        {done ? `Hotovo · ${st.learned}/${st.total}` : `${st.learned} z ${st.total} naučeno`}
+                      </span>
+                    </span>
+                    <Icon name="chevron" size={20} className="text-slate-300" />
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        ) : (
+          <p className="panel font-bold text-slate-500 dark:text-slate-400">Zatím nemáš vybranou žádnou lekci.</p>
+        )}
+      </section>
+
+      {sheet && <PracticeSheet sel={sel} setSel={setSel} cards={s.cards} onClose={() => setSheet(false)} onStart={() => navigate('/practice')} />}
     </div>
   )
-}
-
-/** "1A – At home" -> code "1A", name "At home"; titles without a number stay whole. */
-function splitTitle(title: string) {
-  const m = title.match(/^(\d+[A-Za-z]?)\s*[–-]\s*(.+)$/)
-  return m ? { code: m[1], name: m[2] } : { code: '', name: title }
-}
-
-/** Groups lessons whose titles start with the same number (1A, 1B, 1 – Data → unit 1), keeping order. */
-function groupLessons(ls: Lesson[]) {
-  const groups: { unit: string | null; lessons: Lesson[] }[] = []
-  for (const l of ls) {
-    const unit = l.title.match(/^(\d+)/)?.[1] ?? null
-    const existing = unit ? groups.find(g => g.unit === unit) : undefined
-    if (existing) existing.lessons.push(l)
-    else if (unit) groups.push({ unit, lessons: [l] })
-    else groups.push({ unit: null, lessons: [l] })
-  }
-  return groups
 }
