@@ -7,6 +7,8 @@ import { isLearned, nextLevel, pick, type Item } from '../lib/practice'
 import { speak, speechAvailable } from '../lib/speech'
 import { LEARNED, pkey, type Grade } from '../lib/types'
 import ProgressBar from '../components/ProgressBar'
+import { ChoiceExercise, ScrambleExercise, TypeExercise, type Result } from '../components/Exercises'
+import { MODES } from '../lib/exercise'
 import Confetti from '../components/Confetti'
 
 const GRADES: { id: Grade; label: string; emoji: string; key: string; cls: string }[] = [
@@ -20,7 +22,7 @@ export default function Practice() {
   const [sel] = useSelection()
   const pool: Item[] = useMemo(() => {
     const ids = new Set(sel.lessons)
-    const dirs = dirsOf(sel.dir)
+    const dirs = dirsOf(sel.dir, sel.mode)
     return cards.filter(c => c.status === 'approved' && ids.has(c.lesson_id)).flatMap(card => dirs.map(dir => ({ card, dir })))
   }, [cards, sel])
 
@@ -31,12 +33,19 @@ export default function Practice() {
   const [saveError, setSaveError] = useState(false)
   const [celebrate, setCelebrate] = useState(false)
   const [lastLevelUp, setLastLevelUp] = useState<string | null>(null)
+  const mode = sel.mode
+  /** Outcome of a checked exercise (levels 1–3); null while the pupil is still answering. */
+  const [result, setResult] = useState<Result | null>(null)
+  /** Bumped for every new question so the exercise starts fresh even when the same card comes back. */
+  const [round, setRound] = useState(0)
+  const poolCards = useMemo(() => [...new Set(pool.map(p => p.card))], [pool])
 
   const learned = pool.filter(p => isLearned(levels.get(pkey(p.card.id, p.dir)))).length
   const allLearned = pool.length > 0 && learned === pool.length
 
-  const answer = useCallback(async (grade: Grade) => {
-    if (!current || !flipped) return
+  /** Saves the grade and returns the levels as they are after it. */
+  const record = useCallback((grade: Grade) => {
+    if (!current) return levels
     const key = pkey(current.card.id, current.dir)
     const before = levels.get(key)
     const after = nextLevel(before, grade)
@@ -48,26 +57,54 @@ export default function Practice() {
 
     const nowAll = pool.every(p => isLearned(map.get(pkey(p.card.id, p.dir))))
     if (nowAll && !allLearned) setCelebrate(true)
+
+    const { id } = current.card, dir = current.dir
+    void (async () => {
+      const save = () => supabase.rpc('record_answer', { p_card: id, p_dir: dir, p_grade: grade })
+      let { error } = await save()
+      if (error) ({ error } = await save())
+      setSaveError(!!error)
+    })()
+    return map
+  }, [current, levels, setLevel, pool, allLearned])
+
+  const answer = useCallback((grade: Grade) => {
+    if (!current || !flipped) return
+    const map = record(grade)
     setFlipped(false)
     // Let the card turn back before swapping its content.
     setTimeout(() => setCurrent(pick(pool, map, recent.current)), 180)
+  }, [current, flipped, record, pool])
 
-    const save = () => supabase.rpc('record_answer', { p_card: current.card.id, p_dir: current.dir, p_grade: grade })
-    let { error } = await save()
-    if (error) ({ error } = await save())
-    setSaveError(!!error)
-  }, [current, flipped, levels, setLevel, pool, allLearned])
+  const check = useCallback((r: Result) => {
+    if (result) return
+    setResult(r)
+    record(r.grade)
+  }, [result, record])
+
+  // levels already hold the last answer by the time the pupil asks for the next card.
+  const next = useCallback(() => {
+    setResult(null)
+    setRound(n => n + 1)
+    setCurrent(pick(pool, levels, recent.current))
+  }, [pool, levels])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return
+      // A focused button already reacts to Enter and space by itself.
+      if (e.target instanceof HTMLButtonElement && (e.key === 'Enter' || e.key === ' ')) return
+      if (mode !== 'flip') {
+        if (result && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); next() }
+        return
+      }
       if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setFlipped(f => !f) }
       const g = GRADES.find(g => g.key === e.key)
       if (g) answer(g.id)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [answer])
+  }, [answer, mode, result, next])
 
   useEffect(() => {
     if (!current && pool.length) setCurrent(pick(pool, levels, recent.current))
@@ -109,32 +146,68 @@ export default function Practice() {
         </div>
       )}
 
-      <div className="flip select-none" onClick={() => setFlipped(f => !f)}>
-        <div className={`flip-inner relative min-h-72 cursor-pointer sm:min-h-80 ${flipped ? 'flipped' : ''}`}>
+      {mode === 'flip' ? (<>
+        <div className="flip select-none" onClick={() => setFlipped(f => !f)}>
+          <div className={`flip-inner relative min-h-72 cursor-pointer sm:min-h-80 ${flipped ? 'flipped' : ''}`}>
+            <Face lang={dir === 'en' ? 'EN' : 'CZ'} lesson={lessonTitle} text={front} level={level}
+              onSpeak={dir === 'en' && speechAvailable ? () => speak(card.en) : undefined}
+              hint="Klepni pro otočení" />
+            <Face back lang={dir === 'en' ? 'CZ' : 'EN'} lesson={lessonTitle} text={back} level={level} note={card.note}
+              onSpeak={speechAvailable ? () => speak(card.en) : undefined} />
+          </div>
+        </div>
+
+        {lastLevelUp && !flipped && <p className="pop text-center font-black text-emerald-600 dark:text-emerald-400">⭐ „{lastLevelUp}“ je naučené!</p>}
+
+        {flipped ? (
+          <div className="grid grid-cols-3 gap-2">
+            {GRADES.map(g => (
+              <button key={g.id} onClick={() => answer(g.id)} className={`btn flex-col !gap-0 !px-2 text-white active:shadow-none ${g.cls}`}>
+                <span className="text-3xl">{g.emoji}</span>
+                <span className="text-base sm:text-lg">{g.label}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <button className="btn-primary w-full text-xl" onClick={() => setFlipped(true)}>Otočit kartičku 🔄</button>
+        )}
+
+        <p className="hidden text-center text-sm font-bold text-slate-400 sm:block">Klávesy: mezerník otočí, 1 nevěděl, 2 napůl, 3 věděl</p>
+      </>) : (<>
+        <div className="relative min-h-40 sm:min-h-48">
           <Face lang={dir === 'en' ? 'EN' : 'CZ'} lesson={lessonTitle} text={front} level={level}
             onSpeak={dir === 'en' && speechAvailable ? () => speak(card.en) : undefined}
-            hint="Klepni pro otočení" />
-          <Face back lang={dir === 'en' ? 'CZ' : 'EN'} lesson={lessonTitle} text={back} level={level} note={card.note}
-            onSpeak={speechAvailable ? () => speak(card.en) : undefined} />
+            hint={`${MODES.find(m => m.id === mode)?.emoji} ${dir === 'en' ? 'Jak se to řekne česky?' : 'Jak se to řekne anglicky?'}`} />
         </div>
-      </div>
 
-      {lastLevelUp && !flipped && <p className="pop text-center font-black text-emerald-600 dark:text-emerald-400">⭐ „{lastLevelUp}“ je naučené!</p>}
+        {mode === 'choice' && <ChoiceExercise key={round} card={card} dir={dir} result={result} onAnswer={check} onNext={next} pool={poolCards} all={cards} />}
+        {mode === 'scramble' && <ScrambleExercise key={round} card={card} dir={dir} result={result} onAnswer={check} onNext={next} />}
+        {mode === 'type' && <TypeExercise key={round} card={card} dir={dir} result={result} onAnswer={check} onNext={next} />}
 
-      {flipped ? (
-        <div className="grid grid-cols-3 gap-2">
-          {GRADES.map(g => (
-            <button key={g.id} onClick={() => answer(g.id)} className={`btn flex-col !gap-0 !px-2 text-white active:shadow-none ${g.cls}`}>
-              <span className="text-3xl">{g.emoji}</span>
-              <span className="text-base sm:text-lg">{g.label}</span>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <button className="btn-primary w-full text-xl" onClick={() => setFlipped(true)}>Otočit kartičku 🔄</button>
-      )}
+        {result && (
+          <div className={`panel pop space-y-3 !ring-2 ${result.grade === 'knew' ? '!ring-emerald-400' : result.grade === 'partial' ? '!ring-amber-400' : '!ring-rose-400'}`}>
+            <p className="text-xl font-black">
+              {result.grade === 'knew' ? '✅ Správně!' : result.grade === 'partial' ? `🤔 ${result.hint ?? 'Skoro!'}` : '❌ Tohle nebylo ono.'}
+            </p>
+            {result.grade !== 'knew' || mode === 'type' ? (
+              <div className="flex items-center gap-2">
+                <p className="flex-1 text-lg font-bold">Správně: <span className="font-black text-violet-700 dark:text-violet-300">{back}</span></p>
+                {speechAvailable && <button onClick={() => speak(card.en)} className="rounded-xl bg-violet-100 px-3 py-2 text-lg dark:bg-slate-800" aria-label="Přečíst anglicky">🔊</button>}
+              </div>
+            ) : speechAvailable && (
+              <button onClick={() => speak(card.en)} className="btn-soft !py-2">🔊 {card.en}</button>
+            )}
+            {card.note && <p className="rounded-2xl bg-violet-50 px-4 py-2 font-bold dark:bg-slate-800">{card.note}</p>}
+            {lastLevelUp && <p className="font-black text-emerald-600 dark:text-emerald-400">⭐ „{lastLevelUp}“ je naučené!</p>}
+            <button className="btn-primary w-full text-xl" onClick={next} autoFocus={mode !== 'type'}>Další ➜</button>
+          </div>
+        )}
 
-      <p className="hidden text-center text-sm font-bold text-slate-400 sm:block">Klávesy: mezerník otočí, 1 nevěděl, 2 napůl, 3 věděl</p>
+        <p className="hidden text-center text-sm font-bold text-slate-400 sm:block">
+          {mode === 'choice' ? 'Klávesy: 1–4 vybere odpověď, Enter další' : mode === 'scramble' ? 'Můžeš psát na klávesnici, Backspace vrátí písmeno, Enter další' : 'Enter zkontroluje a pak přejde na další'}
+        </p>
+      </>)}
+
       {saveError && <p className="text-center text-sm font-bold text-rose-600">Poslední odpověď se nepodařilo uložit. Zkontroluj připojení.</p>}
     </div>
   )

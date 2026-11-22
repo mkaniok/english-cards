@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth'
 import { useData } from '../lib/data'
 import { dirsOf, useSelection, type DirMode } from '../lib/selection'
 import { isLearned } from '../lib/practice'
+import { MODES } from '../lib/exercise'
 import { pkey, type Lesson } from '../lib/types'
 import ProgressBar from '../components/ProgressBar'
 import { cardsWord, plural } from '../lib/plural'
@@ -19,7 +20,8 @@ export default function Home() {
   const { loading, error, textbooks, lessons, cards, levels } = useData()
   const [sel, setSel] = useSelection()
   const navigate = useNavigate()
-  const dirs = dirsOf(sel.dir)
+  const dirs = dirsOf(sel.dir, sel.mode)
+  const scramble = sel.mode === 'scramble'
 
   const approved = useMemo(() => cards.filter(c => c.status === 'approved'), [cards])
   const byLesson = useMemo(() => {
@@ -107,13 +109,35 @@ export default function Home() {
       <section className="panel">
         <h2 className="label">Směr</h2>
         <div className="grid grid-cols-3 gap-2">
-          {DIRS.map(d => (
-            <button key={d.id} onClick={() => setSel(v => ({ ...v, dir: d.id }))} title={d.hint}
-              className={`chip justify-center text-lg ${sel.dir === d.id ? 'border-violet-600 bg-violet-600 text-white' : 'border-violet-100 bg-white dark:border-slate-700 dark:bg-slate-900'}`}>
-              {d.label}
-            </button>
-          ))}
+          {DIRS.map(d => {
+            const on = scramble ? d.id === 'cz' : sel.dir === d.id
+            return (
+              <button key={d.id} onClick={() => setSel(v => ({ ...v, dir: d.id }))} title={d.hint} disabled={scramble}
+                className={`chip justify-center text-lg disabled:cursor-not-allowed ${on ? 'border-violet-600 bg-violet-600 text-white' : 'border-violet-100 bg-white dark:border-slate-700 dark:bg-slate-900'} ${scramble && !on ? 'opacity-40' : ''}`}>
+                {d.label}
+              </button>
+            )
+          })}
         </div>
+        {scramble && <p className="mt-2 text-sm font-bold text-slate-500 dark:text-slate-400">Skládání z písmen je vždy česky → anglicky.</p>}
+      </section>
+
+      <section className="panel">
+        <h2 className="label">Cvičení</h2>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {MODES.map(m => {
+            const on = sel.mode === m.id
+            return (
+              <button key={m.id} onClick={() => setSel(v => ({ ...v, mode: m.id }))} title={m.hint} aria-pressed={on}
+                className={`flex flex-col items-center rounded-2xl border-2 px-2 py-2 text-center transition ${on ? 'border-violet-600 bg-violet-600 text-white' : 'border-violet-100 bg-white hover:border-violet-300 dark:border-slate-700 dark:bg-slate-900'}`}>
+                <span className="text-2xl">{m.emoji}</span>
+                <span className="font-extrabold leading-tight">{m.label}</span>
+                <span className={`text-xs font-bold ${on ? 'text-violet-100' : 'text-slate-500 dark:text-slate-400'}`}>{m.level || 'Sám se ohodnotíš'}</span>
+              </button>
+            )
+          })}
+        </div>
+        <p className="mt-2 text-sm font-bold text-slate-500 dark:text-slate-400">{MODES.find(m => m.id === sel.mode)?.hint}</p>
       </section>
 
       {textbooks.map(tb => {
