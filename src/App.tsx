@@ -9,6 +9,8 @@ import Stats from './pages/Stats'
 import Cards from './pages/Cards'
 import ClassPage from './pages/ClassPage'
 import Bugs from './pages/Bugs'
+import Lessons from './pages/Lessons'
+import Profile from './pages/Profile'
 
 export default function App() {
   const { loading, session, profile } = useAuth()
@@ -20,7 +22,9 @@ export default function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/lessons" element={<Lessons />} />
           <Route path="/practice" element={<Practice />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/stats" element={<Stats />} />
           <Route path="/cards" element={<Cards />} />
           {editor && <Route path="/class" element={<ClassPage />} />}

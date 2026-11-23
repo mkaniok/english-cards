@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Card, Dir, Grade } from '../lib/types'
+import Icon from './Icon'
+import Kbd from './Kbd'
 import { answerOf, checkTyped, choicesFor, scrambledLetters, scrambleTarget, slotsOf } from '../lib/exercise'
 
 export interface Result { grade: Grade; hint?: string }
@@ -18,48 +20,70 @@ const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCa
 
 // ---------- Level 1: multiple choice ----------
 
+/** Big check button pinned to the bottom of the exercise, in reach of the thumb. */
+function CheckButton({ disabled, onClick, label = 'Zkontrolovat', type = 'button' }: { disabled?: boolean; onClick?: () => void; label?: string; type?: 'button' | 'submit' }) {
+  return (
+    <button type={type} onClick={onClick} disabled={disabled}
+      className="btn-primary !min-h-14 flex-1 text-xl disabled:!bg-[#e9e5f7] disabled:!text-slate-400 disabled:!shadow-none dark:disabled:!bg-slate-800">
+      {label}<Kbd k="Enter" light />
+    </button>
+  )
+}
+function DontKnow({ onClick }: { onClick: () => void }) {
+  return <button type="button" className="btn-soft !min-h-14 !px-4" onClick={onClick}>Nevím</button>
+}
+
 export function ChoiceExercise({ card, dir, result, onAnswer, pool, all }: Props & { pool: Card[]; all: Card[] }) {
   // Options are fixed for this card; new ones only when the next card comes.
   const [options] = useState(() => choicesFor(card, dir, pool, all))
   const [picked, setPicked] = useState<number | null>(null)
   const right = answerOf(card, dir)
 
-  const choose = (i: number) => {
-    if (result) return
-    setPicked(i)
-    onAnswer({ grade: options[i] === right ? 'knew' : 'unknown' })
+  const submit = () => {
+    if (result || picked === null) return
+    onAnswer({ grade: options[picked] === right ? 'knew' : 'unknown' })
   }
 
   useEffect(() => {
     if (result) return
     const onKey = (e: KeyboardEvent) => {
       const i = Number(e.key) - 1
-      if (i >= 0 && i < options.length) choose(i)
+      if (i >= 0 && i < options.length) setPicked(i)
+      else if (e.key === 'Enter' && picked !== null) { e.preventDefault(); submit() }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
 
   return (
-    <div className="grid gap-2 sm:grid-cols-2">
-      {options.map((o, i) => {
-        const isRight = o === right
-        const state = !result ? 'idle' : isRight ? 'right' : i === picked ? 'wrong' : 'other'
-        return (
-          <button key={i} onClick={() => choose(i)} disabled={!!result}
-            className={`flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left text-lg font-extrabold transition active:scale-[.98] ${{
-              idle: 'border-violet-100 bg-white hover:border-violet-400 dark:border-slate-700 dark:bg-slate-900',
-              right: 'pop border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200',
-              wrong: 'border-rose-500 bg-rose-50 text-rose-800 dark:bg-rose-950/50 dark:text-rose-200',
-              other: 'border-violet-100 bg-white opacity-50 dark:border-slate-700 dark:bg-slate-900',
-            }[state]}`}>
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-violet-100 text-sm font-black text-violet-700 dark:bg-slate-800 dark:text-violet-300">
-              {state === 'right' ? '✓' : state === 'wrong' ? '✗' : i + 1}
-            </span>
-            <span className="[overflow-wrap:anywhere]">{o}</span>
-          </button>
-        )
-      })}
+    <div className="flex flex-1 flex-col">
+      <div className="mt-auto grid gap-2.5 sm:grid-cols-2">
+        {options.map((o, i) => {
+          const isRight = o === right
+          const state = !result ? (i === picked ? 'picked' : 'idle') : isRight ? 'right' : i === picked ? 'wrong' : 'other'
+          return (
+            <button key={i} onClick={() => !result && setPicked(i)} disabled={!!result} aria-pressed={i === picked}
+              className={`flex min-h-15 items-center gap-3 rounded-2xl border-2 border-b-4 px-4 py-3 text-left text-lg font-extrabold transition active:translate-y-0.5 ${{
+                idle: 'border-[#e5e1f2] bg-white hover:bg-violet-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800',
+                picked: 'border-violet-500 bg-violet-50 text-violet-800 dark:border-violet-400 dark:bg-violet-950/60 dark:text-violet-100',
+                right: 'pop border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200',
+                wrong: 'border-rose-500 bg-rose-50 text-rose-800 dark:bg-rose-950/50 dark:text-rose-200',
+                other: 'border-[#eeebf7] bg-white text-slate-400 dark:border-slate-800 dark:bg-slate-900',
+              }[state]}`}>
+              <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg border-2 text-sm font-black ${state === 'picked' ? 'border-violet-300 text-violet-700 dark:text-violet-200' : 'border-[#e5e1f2] text-slate-400 dark:border-slate-700'}`}>
+                {state === 'right' ? <Icon name="check" size={16} stroke={3} /> : state === 'wrong' ? <Icon name="x" size={16} stroke={3} /> : i + 1}
+              </span>
+              <span className="[overflow-wrap:anywhere]">{o}</span>
+            </button>
+          )
+        })}
+      </div>
+      {!result && (
+        <div className="mt-5 flex gap-2">
+          <DontKnow onClick={() => onAnswer({ grade: 'unknown' })} />
+          <CheckButton disabled={picked === null} onClick={submit} />
+        </div>
+      )}
     </div>
   )
 }
@@ -107,25 +131,28 @@ export function ScrambleExercise({ card, result, onAnswer }: Props) {
     words[words.length - 1].push({ ch: s.ch, fixed: s.fixed, pos: s.fixed ? -1 : pos++ })
   }
   const longest = Math.max(...words.map(w => w.length))
-  const box = `min(2.6rem, calc((100vw - 5rem) / ${longest}))`
+  const box = `min(2.75rem, calc((100vw - 5rem) / ${longest}))`
   const wrong = result && result.grade !== 'knew'
 
   return (
-    <div className="panel space-y-5">
+    <div className="flex flex-1 flex-col">
+      {/* Answer: empty dashed boxes that fill up; colour only once it is checked. */}
       <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
         {words.map((w, wi) => (
-          <div key={wi} className="flex gap-1">
+          <div key={wi} className="flex gap-1.5">
             {w.map((s, i) => {
               if (s.fixed) return <span key={i} style={{ width: `calc(${box} / 2)` }} className="grid place-items-center text-2xl font-black">{s.ch}</span>
               const t = placed[s.pos]
               const filled = t !== undefined
               return (
                 <button key={i} onClick={() => filled && remove(s.pos)} disabled={!!result || !filled}
+                  aria-label={filled ? `Vrátit písmeno ${tiles[t]}` : 'Prázdné políčko'}
                   style={{ width: box, height: `calc(${box} * 1.25)` }}
-                  className={`grid place-items-center rounded-xl border-b-4 text-[clamp(1rem,5vw,1.6rem)] font-black transition ${
-                    !filled ? 'border-violet-300 bg-violet-50 dark:border-slate-600 dark:bg-slate-800'
-                    : !result ? 'pop border-violet-700 bg-violet-600 text-white'
-                    : wrong ? 'border-rose-700 bg-rose-500 text-white' : 'border-emerald-700 bg-emerald-500 text-white'}`}>
+                  className={`grid place-items-center rounded-xl text-[clamp(1rem,5vw,1.6rem)] font-black transition ${
+                    !filled ? 'border-2 border-dashed border-[#cfc8e8] dark:border-slate-600'
+                    : !result ? 'pop border-2 border-b-4 border-violet-500 bg-violet-50 text-violet-800 dark:bg-violet-950/60 dark:text-violet-100'
+                    : wrong ? 'border-2 border-b-4 border-rose-500 bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-100'
+                    : 'border-2 border-b-4 border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-100'}`}>
                   {filled ? tiles[t] : ''}
                 </button>
               )
@@ -136,21 +163,24 @@ export function ScrambleExercise({ card, result, onAnswer }: Props) {
 
       {!result && (
         <>
-          <div className="flex flex-wrap justify-center gap-2">
+          <div className="mt-auto flex flex-wrap justify-center gap-2.5 pt-8">
             {tiles.map((ch, i) => {
               const used = placed.includes(i)
               return (
-                <button key={i} onClick={() => place(i)} disabled={used} aria-hidden={used}
-                  className={`h-12 w-12 rounded-2xl bg-white text-2xl font-black text-violet-800 shadow-[0_4px_0_#c4b5fd] ring-2 ring-violet-200 transition active:translate-y-1 active:shadow-none dark:bg-slate-900 dark:text-violet-200 dark:shadow-[0_4px_0_#4c1d95] dark:ring-slate-700 ${used ? 'invisible' : ''}`}>
+                <button key={i} onClick={() => place(i)} disabled={used} aria-hidden={used} tabIndex={used ? -1 : 0}
+                  className={`h-15 w-14 rounded-2xl border-2 border-b-[5px] text-2xl font-black transition active:translate-y-0.5 active:border-b-2 ${used
+                    ? 'border-[#f1eefa] bg-[#f1eefa] text-transparent dark:border-slate-800 dark:bg-slate-800'
+                    : 'border-[#e5e1f2] bg-white text-[#1e1b2e] dark:border-slate-700 dark:bg-slate-900 dark:text-white'}`}>
                   {ch}
                 </button>
               )
             })}
           </div>
-          <div className="flex justify-center gap-2 whitespace-nowrap">
-            <button className="btn-soft !px-4 !py-2" onClick={() => setPlaced(p => p.slice(0, -1))} disabled={!placed.length} aria-label="Vrátit poslední písmeno">⌫</button>
-            <button className="btn-soft !px-4 !py-2" onClick={() => setPlaced([])} disabled={!placed.length}>Smazat</button>
-            <button className="btn-soft !px-4 !py-2" onClick={() => onAnswer({ grade: 'unknown' })}>Nevím 🤷</button>
+          <div className="mt-5 flex gap-2">
+            <button className="btn-soft !min-h-14 !px-4" onClick={() => setPlaced(p => p.slice(0, -1))} disabled={!placed.length} aria-label="Vrátit poslední písmeno">
+              <Icon name="undo" />
+            </button>
+            <button className="btn-soft !min-h-14 flex-1 text-lg" onClick={() => onAnswer({ grade: 'unknown' })}>Nevím</button>
           </div>
         </>
       )}
@@ -174,15 +204,16 @@ export function TypeExercise({ card, dir, result, onAnswer, onNext }: Props) {
     : result.grade === 'partial' ? '!border-amber-500 !bg-amber-50 dark:!bg-amber-950/50' : '!border-rose-500 !bg-rose-50 dark:!bg-rose-950/50'
 
   return (
-    <form className="space-y-2" onSubmit={e => { e.preventDefault(); if (result) onNext(); else check() }}>
-      <input ref={input} value={text} onChange={e => setText(e.target.value)} readOnly={!!result}
+    <form className="flex flex-1 flex-col" onSubmit={e => { e.preventDefault(); if (result) onNext(); else check() }}>
+      <label htmlFor="answer" className="label">Tvoje odpověď</label>
+      <input id="answer" ref={input} value={text} onChange={e => setText(e.target.value)} readOnly={!!result}
         lang={dir === 'en' ? 'cs' : 'en-GB'} placeholder={dir === 'en' ? 'Napiš česky…' : 'Napiš anglicky…'}
         autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} enterKeyHint={result ? 'next' : 'done'}
-        className={`input text-center !text-2xl ${tone}`} />
+        className={`input !min-h-15 !text-2xl ${tone}`} />
       {!result && (
-        <div className="grid grid-cols-[1fr_auto] gap-2">
-          <button type="submit" className="btn-primary text-lg">Zkontrolovat ✔️</button>
-          <button type="button" className="btn-soft" onClick={() => onAnswer({ grade: 'unknown' })}>Nevím 🤷</button>
+        <div className="mt-auto flex gap-2 pt-5">
+          <DontKnow onClick={() => onAnswer({ grade: 'unknown' })} />
+          <CheckButton type="submit" disabled={!text.trim()} />
         </div>
       )}
     </form>
